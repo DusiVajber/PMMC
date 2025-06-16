@@ -8,7 +8,7 @@ const WebGLUtils = {
 			alert('WebGL 2.0 not supported!');
 			return null;
 		}
-
+		
 		return gl;
 	},
 
