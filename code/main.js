@@ -238,6 +238,30 @@ async function main() {
       pitch -= e.movementY * sensitivity;
       pitch = Math.max(Math.min(pitch, Math.PI / 2), -Math.PI / 2);
     }
+
+let selectedSlot = 0;
+const slots = document.querySelectorAll(".hotbar-slot");
+
+function updateHotbarSelection() {
+  slots.forEach((slot, i) => {
+    slot.classList.toggle("selected", i === selectedSlot);
+  });
+}
+
+document.addEventListener("wheel", (e) => {
+  if (e.deltaY > 0) selectedSlot = (selectedSlot + 1) % 9;
+  else selectedSlot = (selectedSlot + 8) % 9;
+  updateHotbarSelection();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key >= '1' && e.key <= '9') {
+    selectedSlot = parseInt(e.key) - 1;
+    updateHotbarSelection();
+  }
+});
+
+
   });
 
   const sceneObject = new SceneObject(gl, "../shapes/log.obj", "../textures/log.webp", program);
