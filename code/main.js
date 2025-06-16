@@ -1,6 +1,134 @@
 import { mat4, vec3 } from 'https://cdn.jsdelivr.net/npm/gl-matrix@3.4.0/+esm';
 import WebGLUtils from '../WebGLUtils.js';
 
+class SceneObject {
+  constructor(gl, objPath, texturePath, program) {
+    this.gl = gl;
+    this.objPath = objPath;
+    this.texturePath = texturePath;
+    this.program = program;
+    this.modelMatrix = mat4.create();
+    this.boundingBox = { min: vec3.create(), max: vec3.create() };
+  }
+
+  async init() {
+    this.vertices = await WebGLUtils.loadOBJ(this.objPath, false);
+    this.texture = await WebGLUtils.loadTexture(this.gl, this.texturePath);
+    this.VAO = WebGLUtils.createVAO(this.gl, this.program, this.vertices, 8, [
+      { name: 'in_position', size: 3, offset: 0 },
+      { name: 'in_uv', size: 2, offset: 3 },
+      { name: 'in_normal', size: 3, offset: 5 },
+    ]);
+    this.calculateAABB();
+  }
+
+  calculateAABB() {
+    let min = vec3.fromValues(Infinity, Infinity, Infinity);
+    let max = vec3.fromValues(-Infinity, -Infinity, -Infinity);
+
+    for (let i = 0; i < this.vertices.length; i += 8) {
+      const x = this.vertices[i];
+      const y = this.vertices[i + 1];
+      const z = this.vertices[i + 2];
+      min[0] = Math.min(min[0], x);
+      min[1] = Math.min(min[1], y);
+      min[2] = Math.min(min[2], z);
+      max[0] = Math.max(max[0], x);
+      max[1] = Math.max(max[1], y);
+      max[2] = Math.max(max[2], z);
+    }
+
+    this.boundingBox = { min, max };
+  }
+
+  updateBoundingBox() {
+    // Transform the bounding box corners by modelMatrix
+    const corners = [
+      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.min[1], this.boundingBox.min[2]),
+      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.min[1], this.boundingBox.min[2]),
+      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.max[1], this.boundingBox.min[2]),
+      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.max[1], this.boundingBox.min[2]),
+      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.min[1], this.boundingBox.max[2]),
+      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.min[1], this.boundingBox.max[2]),
+      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.max[1], this.boundingBox.max[2]),
+      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.max[1], this.boundingBox.max[2]),
+    ];
+
+    const transformedCorners = corners.map(corner => {
+      const transformed = vec3.create();
+      vec3.transformMat4(transformed, corner, this.modelMatrix);
+      return transformed;
+    });
+
+    let min = vec3.clone(transformedCorners[0]);
+    let max = vec3.clone(transformedCorners[0]);
+
+    transformedCorners.forEach(corner => {
+      vec3.min(min, min, corner);
+      vec3.max(max, max, corner);
+    });
+
+    this.transformedBoundingBox = { min, max };
+  }
+
+  draw() {
+    this.gl.useProgram(this.program);
+    this.gl.bindVertexArray(this.VAO);
+    this.gl.activeTexture(this.gl.TEXTURE0);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
+    this.gl.drawArrays(this.gl.TRIANGLES, 0, this.vertices.length / 8);
+  }
+
+  drawBoundingBox() {
+    // Draw wireframe box for bounding box
+    this.updateBoundingBox();
+
+    const b = this.transformedBoundingBox;
+    const corners = [
+      vec3.fromValues(b.min[0], b.min[1], b.min[2]),
+      vec3.fromValues(b.max[0], b.min[1], b.min[2]),
+      vec3.fromValues(b.min[0], b.max[1], b.min[2]),
+      vec3.fromValues(b.max[0], b.max[1], b.min[2]),
+      vec3.fromValues(b.min[0], b.min[1], b.max[2]),
+      vec3.fromValues(b.max[0], b.min[1], b.max[2]),
+      vec3.fromValues(b.min[0], b.max[1], b.max[2]),
+      vec3.fromValues(b.max[0], b.max[1], b.max[2]),
+    ];
+
+    const edges = [
+      [0, 1], [1, 3], [3, 2], [2, 0], // bottom
+      [4, 5], [5, 7], [7, 6], [6, 4], // top
+      [0, 4], [1, 5], [2, 6], [3, 7]  // sides
+    ];
+
+    const lineVertices = [];
+    edges.forEach(([start, end]) => {
+      lineVertices.push(...corners[start], ...corners[end]);
+    });
+
+    if (!this.boundingBoxVAO) {
+      this.boundingBoxVAO = this.gl.createVertexArray();
+      this.gl.bindVertexArray(this.boundingBoxVAO);
+
+      this.boundingBoxVBO = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.boundingBoxVBO);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(lineVertices), this.gl.DYNAMIC_DRAW);
+
+      const posLoc = this.gl.getAttribLocation(this.program, 'in_position');
+      this.gl.enableVertexAttribArray(posLoc);
+      this.gl.vertexAttribPointer(posLoc, 3, this.gl.FLOAT, false, 0, 0);
+    } else {
+      this.gl.bindVertexArray(this.boundingBoxVAO);
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.boundingBoxVBO);
+      this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, new Float32Array(lineVertices));
+    }
+
+    this.gl.useProgram(this.program);
+    this.gl.bindVertexArray(this.boundingBoxVAO);
+    this.gl.drawArrays(this.gl.LINES, 0, lineVertices.length / 3);
+  }
+}
+
 async function main() {
   const gl = WebGLUtils.initWebGL();
 
@@ -8,137 +136,44 @@ async function main() {
   gl.enable(gl.CULL_FACE);
   gl.cullFace(gl.BACK);
 
- 
   WebGLUtils.resizeCanvasToWindow(gl);
 
-
-  const vertices = await WebGLUtils.loadOBJ("../shapes/log.obj", false);
-  const texture = await WebGLUtils.loadTexture(gl, "../textures/log.webp");
-
-
   const program = await WebGLUtils.createProgram(gl, "vertex-shader.glsl", "fragment-shader.glsl");
-
   gl.useProgram(program);
+
   const textureLoc = gl.getUniformLocation(program, "u_texture");
   gl.uniform1i(textureLoc, 0);
 
-  // Setup lights
-  const lightDir = vec3.fromValues(2.0, 2.0, 2.0);
-  const lightColor = vec3.fromValues(1, 1, 1);    // white light
-  const ambientColor = vec3.fromValues(0.1, 0.1, 0.1);  // dimmed ambient light
+  const lightColor = vec3.fromValues(1, 1, 1);
+  const ambientColor = vec3.fromValues(0.1, 0.1, 0.1);
 
   let cameraPos = vec3.fromValues(2, 2, 5);
   let yaw = -Math.PI / 2;
-  let pitch = 0;function render() {
-    gl.clearColor(1, 1, 1, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  
-    updateCameraPosition();
-  
-    const front = vec3.fromValues(
-      Math.cos(pitch) * Math.cos(yaw),
-      Math.sin(pitch),
-      Math.cos(pitch) * Math.sin(yaw)
-    );
-    vec3.normalize(front, front);
-  
-    const viewMat = mat4.create();
-    mat4.lookAt(viewMat, cameraPos, vec3.add(vec3.create(), cameraPos, front), up);
-  
-    const projectionMat = mat4.create();
-    mat4.perspective(projectionMat, Math.PI / 4, gl.canvas.width / gl.canvas.height, 0.1, 100.0);
-  
-    WebGLUtils.setUniformMatrix4fv(gl, program,
-      ["u_model", "u_view", "u_projection"],
-      [mat4.create(), viewMat, projectionMat]
-    );
-  
-    // Update light direction based on camera orientation
-    const lightDir = vec3.fromValues(
-      Math.cos(pitch) * Math.cos(yaw),
-      Math.sin(pitch),
-      Math.cos(pitch) * Math.sin(yaw)
-    );
-    vec3.normalize(lightDir, lightDir);
-  
-    // Set the updated light direction
-    WebGLUtils.setUniform3f(gl, program, ["u_light_direction"], [lightDir]);
-  
-    gl.useProgram(program);
-    gl.bindVertexArray(VAO);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 8);
-  
-    requestAnimationFrame(render);
-  }
-  
+  let pitch = 0;
+
   const sensitivity = 0.002;
   const movementSpeed = 0.1;
   const up = vec3.fromValues(0, 1, 0);
 
-
-  WebGLUtils.setUniform3f(gl, program,
-    ["u_view_direction", "u_ambient_color", "u_light_direction", "u_light_color"],
-    [cameraPos, ambientColor, lightDir, lightColor]
-  );
-
-  const VAO = WebGLUtils.createVAO(gl, program, vertices, 8, [
-    { name: "in_position", size: 3, offset: 0 },
-    { name: "in_uv", size: 2, offset: 3 },
-    { name: "in_normal", size: 3, offset: 5 },
-  ]);
-  
-
   let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 
-  // Toggle pointer lock with 'L' key
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'l' || event.key === 'L') {
-      if (document.pointerLockElement === gl.canvas) {
-        document.exitPointerLock();
-      } else {
-        gl.canvas.requestPointerLock();
-      }
+  // Replace this with collision detection against sceneObject.boundingBox
+  function checkCollision(pos) {
+    if (!sceneObject.transformedBoundingBox) return false;
+    const bb = sceneObject.transformedBoundingBox;
+    const buffer = 0.2;
+    return (
+      pos[0] >= bb.min[0] - buffer && pos[0] <= bb.max[0] + buffer &&
+      pos[1] >= bb.min[1] - buffer && pos[1] <= bb.max[1] + buffer &&
+      pos[2] >= bb.min[2] - buffer && pos[2] <= bb.max[2] + buffer
+    );
+  }
+
+  function tryMoveCamera(newPos) {
+    if (!checkCollision(newPos)) {
+      vec3.copy(cameraPos, newPos);
     }
-    switch (event.key) {
-      case 'w': moveForward = true; break;
-      case 's': moveBackward = true; break;
-      case 'a': moveLeft = true; break;
-      case 'd': moveRight = true; break;
-    }
-  });
-
-  document.addEventListener('keyup', (event) => {
-    switch (event.key) {
-      case 'w': moveForward = false; break;
-      case 's': moveBackward = false; break;
-      case 'a': moveLeft = false; break;
-      case 'd': moveRight = false; break;
-    }
-  });
-
-  document.addEventListener('pointerlockchange', () => {
-    if (document.pointerLockElement === gl.canvas) {
-      console.log('Pointer locked');
-    } else {
-      console.log('Pointer unlocked');
-    }
-  });
-
-  document.addEventListener('mousemove', (event) => {
-    if (document.pointerLockElement === gl.canvas) {
-      const movementX = event.movementX || 0;
-      const movementY = event.movementY || 0;
-
-      yaw += movementX * sensitivity;
-      pitch -= movementY * sensitivity;
-
-      pitch = Math.max(Math.min(pitch, Math.PI / 2), -Math.PI / 2);
-    }
-  });
-
-  
+  }
 
   function updateCameraPosition() {
     const front = vec3.fromValues(
@@ -164,52 +199,87 @@ async function main() {
     const rightMove = vec3.create();
     vec3.scaleAndAdd(rightMove, cameraPos, right, movementSpeed);
 
-    if (moveForward) vec3.copy(cameraPos, forward);
-    if (moveBackward) vec3.copy(cameraPos, backward);
-    if (moveLeft) vec3.copy(cameraPos, left);
-    if (moveRight) vec3.copy(cameraPos, rightMove);
+    if (moveForward) tryMoveCamera(forward);
+    if (moveBackward) tryMoveCamera(backward);
+    if (moveLeft) tryMoveCamera(left);
+    if (moveRight) tryMoveCamera(rightMove);
   }
 
+  document.addEventListener('keydown', (e) => {
+    switch (e.key) {
+      case 'w': moveForward = true; break;
+      case 's': moveBackward = true; break;
+      case 'a': moveLeft = true; break;
+      case 'd': moveRight = true; break;
+      case 'l':
+      case 'L':
+        if (document.pointerLockElement === gl.canvas) document.exitPointerLock();
+        else gl.canvas.requestPointerLock();
+        break;
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    switch (e.key) {
+      case 'w': moveForward = false; break;
+      case 's': moveBackward = false; break;
+      case 'a': moveLeft = false; break;
+      case 'd': moveRight = false; break;
+    }
+  });
+
+  document.addEventListener('pointerlockchange', () => {
+    console.log(document.pointerLockElement === gl.canvas ? 'Pointer locked' : 'Pointer unlocked');
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (document.pointerLockElement === gl.canvas) {
+      yaw += e.movementX * sensitivity;
+      pitch -= e.movementY * sensitivity;
+      pitch = Math.max(Math.min(pitch, Math.PI / 2), -Math.PI / 2);
+    }
+  });
+
+  const sceneObject = new SceneObject(gl, "../shapes/log.obj", "../textures/log.webp", program);
+  await sceneObject.init();
+
+  // Identity matrix or apply any model transform you want here
+  mat4.identity(sceneObject.modelMatrix);
+
   function render() {
-    gl.clearColor(1, 1, 1, 1.0);
+    gl.clearColor(1, 1, 1, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  
+
     updateCameraPosition();
-  
+
     const front = vec3.fromValues(
       Math.cos(pitch) * Math.cos(yaw),
       Math.sin(pitch),
       Math.cos(pitch) * Math.sin(yaw)
     );
     vec3.normalize(front, front);
-  
+
     const viewMat = mat4.create();
     mat4.lookAt(viewMat, cameraPos, vec3.add(vec3.create(), cameraPos, front), up);
-  
-    const projectionMat = mat4.create();vec3.fromValues(
-      Math.cos(pitch) * Math.cos(yaw),
-      Math.sin(pitch),
-      Math.cos(pitch) * Math.sin(yaw)
-    );
-    vec3.normalize(front, front);
+
+    const projectionMat = mat4.create();
     mat4.perspective(projectionMat, Math.PI / 4, gl.canvas.width / gl.canvas.height, 0.1, 100.0);
-  
+
     WebGLUtils.setUniformMatrix4fv(gl, program,
       ["u_model", "u_view", "u_projection"],
-      [mat4.create(), viewMat, projectionMat]
+      [sceneObject.modelMatrix, viewMat, projectionMat]
     );
 
-    WebGLUtils.setUniform3f(gl, program, ["u_light_direction"], [front]);
-  
-    gl.useProgram(program);
-    gl.bindVertexArray(VAO);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 8);
-  
+    WebGLUtils.setUniform3f(gl, program,
+      ["u_light_direction", "u_ambient_color", "u_light_color", "u_view_direction"],
+      [front, ambientColor, lightColor, cameraPos]
+    );
+
+    sceneObject.draw();
+    sceneObject.drawBoundingBox();
+
     requestAnimationFrame(render);
   }
-  
 
   render();
 }
