@@ -8,12 +8,12 @@ async function main() {
   gl.enable(gl.CULL_FACE);
   gl.cullFace(gl.BACK);
 
-
+ 
   WebGLUtils.resizeCanvasToWindow(gl);
 
 
-  const vertices = await WebGLUtils.loadOBJ("../shapes/grass.obj", false);
-  const texture = await WebGLUtils.loadTexture(gl, "../textures/brick.webp");
+  const vertices = await WebGLUtils.loadOBJ("../shapes/log.obj", false);
+  const texture = await WebGLUtils.loadTexture(gl, "../textures/log.webp");
 
 
   const program = await WebGLUtils.createProgram(gl, "vertex-shader.glsl", "fragment-shader.glsl");
@@ -24,12 +24,55 @@ async function main() {
 
   // Setup lights
   const lightDir = vec3.fromValues(2.0, 2.0, 2.0);
-  const lightColor = vec3.fromValues(0.95, 0.95, 0.95);    // white light
+  const lightColor = vec3.fromValues(1, 1, 1);    // white light
   const ambientColor = vec3.fromValues(0.1, 0.1, 0.1);  // dimmed ambient light
 
   let cameraPos = vec3.fromValues(2, 2, 5);
   let yaw = -Math.PI / 2;
-  let pitch = 0;
+  let pitch = 0;function render() {
+    gl.clearColor(1, 1, 1, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  
+    updateCameraPosition();
+  
+    const front = vec3.fromValues(
+      Math.cos(pitch) * Math.cos(yaw),
+      Math.sin(pitch),
+      Math.cos(pitch) * Math.sin(yaw)
+    );
+    vec3.normalize(front, front);
+  
+    const viewMat = mat4.create();
+    mat4.lookAt(viewMat, cameraPos, vec3.add(vec3.create(), cameraPos, front), up);
+  
+    const projectionMat = mat4.create();
+    mat4.perspective(projectionMat, Math.PI / 4, gl.canvas.width / gl.canvas.height, 0.1, 100.0);
+  
+    WebGLUtils.setUniformMatrix4fv(gl, program,
+      ["u_model", "u_view", "u_projection"],
+      [mat4.create(), viewMat, projectionMat]
+    );
+  
+    // Update light direction based on camera orientation
+    const lightDir = vec3.fromValues(
+      Math.cos(pitch) * Math.cos(yaw),
+      Math.sin(pitch),
+      Math.cos(pitch) * Math.sin(yaw)
+    );
+    vec3.normalize(lightDir, lightDir);
+  
+    // Set the updated light direction
+    WebGLUtils.setUniform3f(gl, program, ["u_light_direction"], [lightDir]);
+  
+    gl.useProgram(program);
+    gl.bindVertexArray(VAO);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 8);
+  
+    requestAnimationFrame(render);
+  }
+  
   const sensitivity = 0.002;
   const movementSpeed = 0.1;
   const up = vec3.fromValues(0, 1, 0);
@@ -130,35 +173,43 @@ async function main() {
   function render() {
     gl.clearColor(1, 1, 1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
+  
     updateCameraPosition();
-
+  
     const front = vec3.fromValues(
       Math.cos(pitch) * Math.cos(yaw),
       Math.sin(pitch),
       Math.cos(pitch) * Math.sin(yaw)
     );
     vec3.normalize(front, front);
-
+  
     const viewMat = mat4.create();
     mat4.lookAt(viewMat, cameraPos, vec3.add(vec3.create(), cameraPos, front), up);
-
-    const projectionMat = mat4.create();
+  
+    const projectionMat = mat4.create();vec3.fromValues(
+      Math.cos(pitch) * Math.cos(yaw),
+      Math.sin(pitch),
+      Math.cos(pitch) * Math.sin(yaw)
+    );
+    vec3.normalize(front, front);
     mat4.perspective(projectionMat, Math.PI / 4, gl.canvas.width / gl.canvas.height, 0.1, 100.0);
-
+  
     WebGLUtils.setUniformMatrix4fv(gl, program,
       ["u_model", "u_view", "u_projection"],
       [mat4.create(), viewMat, projectionMat]
     );
 
+    WebGLUtils.setUniform3f(gl, program, ["u_light_direction"], [front]);
+  
     gl.useProgram(program);
     gl.bindVertexArray(VAO);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 8);
-
+  
     requestAnimationFrame(render);
   }
+  
 
   render();
 }
