@@ -3,16 +3,29 @@ import WebGLUtils from '../WebGLUtils.js';
 
 async function main() {
   const gl = WebGLUtils.initWebGL();
+
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.CULL_FACE);
   gl.cullFace(gl.BACK);
 
+
   WebGLUtils.resizeCanvasToWindow(gl);
+
 
   const vertices = await WebGLUtils.loadOBJ("../shapes/grass.obj", false);
   const texture = await WebGLUtils.loadTexture(gl, "../textures/brick.webp");
 
+
   const program = await WebGLUtils.createProgram(gl, "vertex-shader.glsl", "fragment-shader.glsl");
+
+  gl.useProgram(program);
+  const textureLoc = gl.getUniformLocation(program, "u_texture");
+  gl.uniform1i(textureLoc, 0);
+
+  // Setup lights
+  const lightDir = vec3.fromValues(2.0, 2.0, 2.0);
+  const lightColor = vec3.fromValues(0.95, 0.95, 0.95);    // white light
+  const ambientColor = vec3.fromValues(0.1, 0.1, 0.1);  // dimmed ambient light
 
   let cameraPos = vec3.fromValues(2, 2, 5);
   let yaw = -Math.PI / 2;
@@ -20,6 +33,19 @@ async function main() {
   const sensitivity = 0.002;
   const movementSpeed = 0.1;
   const up = vec3.fromValues(0, 1, 0);
+
+
+  WebGLUtils.setUniform3f(gl, program,
+    ["u_view_direction", "u_ambient_color", "u_light_direction", "u_light_color"],
+    [cameraPos, ambientColor, lightDir, lightColor]
+  );
+
+  const VAO = WebGLUtils.createVAO(gl, program, vertices, 8, [
+    { name: "in_position", size: 3, offset: 0 },
+    { name: "in_uv", size: 2, offset: 3 },
+    { name: "in_normal", size: 3, offset: 5 },
+  ]);
+  
 
   let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 
@@ -49,8 +75,6 @@ async function main() {
     }
   });
 
-
-
   document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement === gl.canvas) {
       console.log('Pointer locked');
@@ -70,12 +94,6 @@ async function main() {
       pitch = Math.max(Math.min(pitch, Math.PI / 2), -Math.PI / 2);
     }
   });
-
-  const VAO = WebGLUtils.createVAO(gl, program, vertices, 8, [
-    { name: "in_position", size: 3, offset: 0 },
-    { name: "in_uv", size: 2, offset: 3 },
-    { name: "in_normal", size: 3, offset: 5 },
-  ]);
 
   
 

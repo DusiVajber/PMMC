@@ -4,7 +4,7 @@ Poor Mans Minecraft
 	#1 Breaking and placing blocks
 	#2 Shading
 	#3 Ray casting
-	#4 Library: WebGL Utils
+	#4 Library: WebGLUtils
 
 > Logic:
  

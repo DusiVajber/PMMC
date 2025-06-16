@@ -15,8 +15,6 @@ in vec2 v_uv;
 out vec4 out_color;
 
 void main() {
-
-vec3 u_light_direction= normalize(u_view_direction*vec4(-1,-1,-1,0).xyz);
 vec3 ambient = u_ambient_color;
 
 float diffuseStrength = max(dot(v_normal, u_light_direction), 0.0);
