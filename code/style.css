@@ -1,0 +1,88 @@
+#hotbar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 10px;
+  border-radius: 8px;
+  user-select: none;
+  z-index: 1000;
+}
+
+.hotbar-slot {
+  width: 48px;
+  height: 48px;
+  background-color: #222;
+  border: 2px solid #555;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background-color 0.2s;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.hotbar-slot img {
+  max-width: 32px;
+  max-height: 32px;
+  pointer-events: none;
+}
+
+.hotbar-slot.selected {
+  border-color: #f0a500;
+  background-color: #333;
+}
+
+.hotbar-slot:hover {
+  border-color: #888;
+}
+
+.hotbar-slot::after {
+  content: attr(data-index);
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 12px;
+  color: #aaa;
+  user-select: none;
+  font-family: monospace;
+}
+
+#crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  pointer-events: none; /* So it doesn't block mouse events */
+  z-index: 2000;
+}
+
+#crosshair::before,
+#crosshair::after {
+  content: '';
+  position: absolute;
+  background-color: red;
+}
+
+#crosshair::before {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+#crosshair::after {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+}
