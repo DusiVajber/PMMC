@@ -185,8 +185,6 @@ function rayIntersectAABBWithFace(origin, direction, aabb, maxDistance = 8) {
   };
 }
 
-
-
 async function main() {
   const gl = WebGLUtils.initWebGL();
 
@@ -231,6 +229,36 @@ async function main() {
 
   gl.bindVertexArray(null);
 
+  // Hotbar setup
+  const hotbar = document.getElementById('hotbar');
+  const slots = hotbar.querySelectorAll('.hotbar-slot');
+  let selectedIndex = 0; // 0-based
+
+  function selectSlot(index) {
+    if (index < 0 || index >= slots.length) return;
+
+    slots.forEach(slot => slot.classList.remove('selected'));
+    slots[index].classList.add('selected');
+    selectedIndex = index;
+    
+    // TODO: Add logic to equip this slot in your game
+  }
+
+  // Click interaction
+  slots.forEach((slot, idx) => {
+    slot.addEventListener('click', () => selectSlot(idx));
+  });
+
+  // Keyboard interaction (1-9 keys)
+  document.addEventListener('keydown', e => {
+    if (e.key >= '1' && e.key <= '9') {
+      const index = parseInt(e.key) - 1;
+      selectSlot(index);
+    }
+  });
+
+  // Initialize default selection
+  selectSlot(0);
 
   // Replace this with collision detection against sceneObject.boundingBox
   function checkCollision(pos) {
@@ -313,39 +341,6 @@ async function main() {
       pitch -= e.movementY * sensitivity;
       pitch = Math.max(Math.min(pitch, Math.PI / 2), -Math.PI / 2);
     }
-
-const hotbar = document.getElementById('hotbar');
-const slots = hotbar.querySelectorAll('.hotbar-slot');
-let selectedIndex = 0; // 0-based
-
-function selectSlot(index) {
-  if (index < 0 || index >= slots.length) return;
-
-  slots.forEach(slot => slot.classList.remove('selected'));
-  slots[index].classList.add('selected');
-  selectedIndex = index;
-
-  console.log(`Equipped slot ${index + 1}`);
-  // TODO: Add logic to equip this slot in your game
-}
-
-// Click interaction
-slots.forEach((slot, idx) => {
-  slot.addEventListener('click', () => selectSlot(idx));
-});
-
-// Keyboard interaction (1-9 keys)
-window.addEventListener('keydown', e => {
-  if (e.key >= '1' && e.key <= '9') {
-    const index = parseInt(e.key) - 1;
-    selectSlot(index);
-  }
-});
-
-// Initialize default selection
-selectSlot(0);
-
-
   });
 
   const sceneObject = new SceneObject(gl, "../shapes/log.obj", "../textures/log.webp", program);
@@ -378,9 +373,6 @@ selectSlot(0);
       }
     }
   });
-  
-  
-  
 
   function render() {
     gl.clearColor(1, 1, 1, 1);
