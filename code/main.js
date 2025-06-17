@@ -129,6 +129,64 @@ class SceneObject {
   }
 }
 
+const faceNames = {
+  0: 'Left (-X)',
+  1: 'Right (+X)',
+  2: 'Bottom (-Y)',
+  3: 'Top (+Y)',
+  4: 'Back (-Z)',
+  5: 'Front (+Z)'
+};
+
+function rayIntersectAABBWithFace(origin, direction, aabb, maxDistance = 8) {
+  let tNear = -Infinity;
+  let tFar = Infinity;
+  let faceIndex = -1;
+
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(direction[i]) < 1e-8) {
+      if (origin[i] < aabb.min[i] || origin[i] > aabb.max[i]) return null;
+    } else {
+      let ood = 1 / direction[i];
+      let t1 = (aabb.min[i] - origin[i]) * ood;
+      let t2 = (aabb.max[i] - origin[i]) * ood;
+
+      let faceNear, faceFar;
+      if (t1 < t2) {
+        faceNear = i * 2 + 0; // min face for axis i
+        faceFar = i * 2 + 1;  // max face for axis i
+      } else {
+        [t1, t2] = [t2, t1];
+        faceNear = i * 2 + 1;
+        faceFar = i * 2 + 0;
+      }
+
+      if (t1 > tNear) {
+        tNear = t1;
+        faceIndex = faceNear;
+      }
+      if (t2 < tFar) {
+        tFar = t2;
+      }
+
+      if (tNear > tFar) return null;
+      if (tFar < 0) return null;
+    }
+  }
+
+  if (tNear < 0 || tNear > maxDistance) return null;
+
+  const intersectionPoint = vec3.create();
+  vec3.scaleAndAdd(intersectionPoint, origin, direction, tNear);
+
+  return {
+    point: intersectionPoint,
+    faceIndex: faceIndex
+  };
+}
+
+
+
 async function main() {
   const gl = WebGLUtils.initWebGL();
 
@@ -156,6 +214,23 @@ async function main() {
   const up = vec3.fromValues(0, 1, 0);
 
   let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+  let rayActive = false;
+  let rayPoints = [vec3.create(), vec3.create()];  // start and end points of the ray
+
+  // Setup ray VAO/VBO
+  const rayVAO = gl.createVertexArray();
+  const rayVBO = gl.createBuffer();
+
+  gl.bindVertexArray(rayVAO);
+  gl.bindBuffer(gl.ARRAY_BUFFER, rayVBO);
+  gl.bufferData(gl.ARRAY_BUFFER, 2 * 3 * 4, gl.DYNAMIC_DRAW); // 2 points * 3 floats * 4 bytes
+
+  const posLoc = gl.getAttribLocation(program, 'in_position');
+  gl.enableVertexAttribArray(posLoc);
+  gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
+
+  gl.bindVertexArray(null);
+
 
   // Replace this with collision detection against sceneObject.boundingBox
   function checkCollision(pos) {
@@ -245,6 +320,35 @@ async function main() {
 
   // Identity matrix or apply any model transform you want here
   mat4.identity(sceneObject.modelMatrix);
+
+  gl.canvas.addEventListener('click', (e) => {
+    if (e.button === 0) {  // Left click only
+      const forward = vec3.fromValues(
+        Math.cos(pitch) * Math.cos(yaw),
+        Math.sin(pitch),
+        Math.cos(pitch) * Math.sin(yaw)
+      );
+      vec3.normalize(forward, forward);
+  
+      rayPoints[0] = vec3.clone(cameraPos);
+      rayPoints[1] = vec3.create();
+      vec3.scaleAndAdd(rayPoints[1], cameraPos, forward, 4); // max distance 4 units
+  
+      rayActive = true;
+  
+      const hitInfo = rayIntersectAABBWithFace(cameraPos, forward, sceneObject.transformedBoundingBox, 4);
+      if (hitInfo) {
+        console.log("Ray hit the object!");
+        console.log("Intersection point:", hitInfo.point);
+        console.log("Hit face:", faceNames[hitInfo.faceIndex]);
+      } else {
+        console.log("Ray missed.");
+      }
+    }
+  });
+  
+  
+  
 
   function render() {
     gl.clearColor(1, 1, 1, 1);
