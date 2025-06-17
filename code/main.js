@@ -332,14 +332,13 @@ async function main() {
   
       rayPoints[0] = vec3.clone(cameraPos);
       rayPoints[1] = vec3.create();
-      vec3.scaleAndAdd(rayPoints[1], cameraPos, forward, 4); // max distance 4 units
+      vec3.scaleAndAdd(rayPoints[1], cameraPos, forward, 6); 
   
       rayActive = true;
   
-      const hitInfo = rayIntersectAABBWithFace(cameraPos, forward, sceneObject.transformedBoundingBox, 4);
+      const hitInfo = rayIntersectAABBWithFace(cameraPos, forward, sceneObject.transformedBoundingBox, 6);
       if (hitInfo) {
         console.log("Ray hit the object!");
-        console.log("Intersection point:", hitInfo.point);
         console.log("Hit face:", faceNames[hitInfo.faceIndex]);
       } else {
         console.log("Ray missed.");
