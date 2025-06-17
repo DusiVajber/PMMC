@@ -42,7 +42,6 @@ class SceneObject {
   }
 
   updateBoundingBox() {
-    // Transform the bounding box corners by modelMatrix
     const corners = [
       vec3.fromValues(this.boundingBox.min[0], this.boundingBox.min[1], this.boundingBox.min[2]),
       vec3.fromValues(this.boundingBox.max[0], this.boundingBox.min[1], this.boundingBox.min[2]),
@@ -80,7 +79,6 @@ class SceneObject {
   }
 
   drawBoundingBox() {
-    // Draw wireframe box for bounding box
     this.updateBoundingBox();
 
     const b = this.transformedBoundingBox;
@@ -96,9 +94,9 @@ class SceneObject {
     ];
 
     const edges = [
-      [0, 1], [1, 3], [3, 2], [2, 0], // bottom
-      [4, 5], [5, 7], [7, 6], [6, 4], // top
-      [0, 4], [1, 5], [2, 6], [3, 7]  // sides
+      [0, 1], [1, 3], [3, 2], [2, 0],
+      [4, 5], [5, 7], [7, 6], [6, 4],
+      [0, 4], [1, 5], [2, 6], [3, 7]
     ];
 
     const lineVertices = [];
@@ -153,8 +151,8 @@ function rayIntersectAABBWithFace(origin, direction, aabb, maxDistance = 8) {
 
       let faceNear, faceFar;
       if (t1 < t2) {
-        faceNear = i * 2 + 0; // min face for axis i
-        faceFar = i * 2 + 1;  // max face for axis i
+        faceNear = i * 2 + 0;
+        faceFar = i * 2 + 1;
       } else {
         [t1, t2] = [t2, t1];
         faceNear = i * 2 + 1;
@@ -213,7 +211,7 @@ async function main() {
 
   let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
   let rayActive = false;
-  let rayPoints = [vec3.create(), vec3.create()];  // start and end points of the ray
+  let rayPoints = [vec3.create(), vec3.create()];
 
   // Setup ray VAO/VBO
   const rayVAO = gl.createVertexArray();
@@ -221,7 +219,7 @@ async function main() {
 
   gl.bindVertexArray(rayVAO);
   gl.bindBuffer(gl.ARRAY_BUFFER, rayVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, 2 * 3 * 4, gl.DYNAMIC_DRAW); // 2 points * 3 floats * 4 bytes
+  gl.bufferData(gl.ARRAY_BUFFER, 2 * 3 * 4, gl.DYNAMIC_DRAW);
 
   const posLoc = gl.getAttribLocation(program, 'in_position');
   gl.enableVertexAttribArray(posLoc);
@@ -229,10 +227,24 @@ async function main() {
 
   gl.bindVertexArray(null);
 
-  // Hotbar setup
+  // Hotbar setup with block types
   const hotbar = document.getElementById('hotbar');
   const slots = hotbar.querySelectorAll('.hotbar-slot');
-  let selectedIndex = 0; // 0-based
+  let selectedIndex = 0;
+  let selectedBlockType = 1; // Default to dirt (1)
+  
+  // Block type mapping (you can expand this)
+  const blockTypes = {
+    1: 'dirt',
+    2: 'grass',
+    3: 'oaklog',
+    4: 'oakplank',
+    5: 'brick',
+    6: 'dirt',
+    7: 'grass',
+    8: 'oaklog',
+    9: 'oakplank'
+  };
 
   function selectSlot(index) {
     if (index < 0 || index >= slots.length) return;
@@ -241,7 +253,9 @@ async function main() {
     slots[index].classList.add('selected');
     selectedIndex = index;
     
-    // TODO: Add logic to equip this slot in your game
+    // Update selected block type (index + 1 since slots are 0-based)
+    selectedBlockType = index + 1;
+    console.log(`Selected block type: ${selectedBlockType} (${blockTypes[selectedBlockType]})`);
   }
 
   // Click interaction
@@ -260,7 +274,6 @@ async function main() {
   // Initialize default selection
   selectSlot(0);
 
-  // Replace this with collision detection against sceneObject.boundingBox
   function checkCollision(pos) {
     if (!sceneObject.transformedBoundingBox) return false;
     const bb = sceneObject.transformedBoundingBox;
@@ -346,11 +359,10 @@ async function main() {
   const sceneObject = new SceneObject(gl, "../shapes/log.obj", "../textures/log.webp", program);
   await sceneObject.init();
 
-  // Identity matrix or apply any model transform you want here
   mat4.identity(sceneObject.modelMatrix);
 
   gl.canvas.addEventListener('click', (e) => {
-    if (e.button === 0) {  // Left click only
+    if (e.button === 0) {
       const forward = vec3.fromValues(
         Math.cos(pitch) * Math.cos(yaw),
         Math.sin(pitch),
@@ -366,7 +378,7 @@ async function main() {
   
       const hitInfo = rayIntersectAABBWithFace(cameraPos, forward, sceneObject.transformedBoundingBox, 6);
       if (hitInfo) {
-        console.log("Ray hit the object!");
+        console.log(`Ray hit with block type ${selectedBlockType} (${blockTypes[selectedBlockType]})`);
         console.log("Hit face:", faceNames[hitInfo.faceIndex]);
       } else {
         console.log("Ray missed.");
