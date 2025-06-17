@@ -1,283 +1,282 @@
-// ... (Originalni kod za Block klasu i pomoćne funkcije ostaje nepromenjen) ...
 import { mat4, vec3 } from 'https://cdn.jsdelivr.net/npm/gl-matrix@3.4.0/+esm';
 import WebGLUtils from '../WebGLUtils.js';
 
 class Block {
-  constructor(gl, objPath, texturePath, program, position = vec3.create(), scale = 1.0) {
-    this.gl = gl;
-    this.objPath = objPath;
-    this.texturePath = texturePath;
-    this.program = program;
-    this.modelMatrix = mat4.create();
-    this.boundingBox = { min: vec3.create(), max: vec3.create() };
-    this.position = position;
-    this.scale = scale;
-    
-    this.transformedBoundingBox = { min: vec3.create(), max: vec3.create() };
-    
-    this.updateModelMatrix();
-  }
+  constructor(gl, objPath, texturePath, program, position = vec3.create(), scale = 1.0) {
+    this.gl = gl;
+    this.objPath = objPath;
+    this.texturePath = texturePath;
+    this.program = program;
+    this.modelMatrix = mat4.create();
+    this.boundingBox = { min: vec3.create(), max: vec3.create() };
+    this.position = position;
+    this.scale = scale;
 
-  async init() {
-    this.vertices = await WebGLUtils.loadOBJ(this.objPath, false);
-    if (!this.vertices || this.vertices.length === 0) {
-        console.error(`Failed to load OBJ vertices for ${this.objPath}.`);
-        return false;
-    }
-    this.texture = await WebGLUtils.loadTexture(this.gl, this.texturePath);
-    if (!this.texture) {
-        console.error(`Failed to load texture for ${this.texturePath}.`);
-        return false;
-    }
+    this.transformedBoundingBox = { min: vec3.create(), max: vec3.create() };
 
-    if (!this.program) {
-        console.error("Attempted to initialize Block with an invalid shader program.");
-        return false;
-    }
+    this.updateModelMatrix();
+  }
 
-    this.gl.useProgram(this.program);
-    this.VAO = WebGLUtils.createVAO(this.gl, this.program, this.vertices, 8, [
-      { name: 'in_position', size: 3, offset: 0 },
-      { name: 'in_uv', size: 2, offset: 3 },
-      { name: 'in_normal', size: 3, offset: 5 },
-    ]);
-    
-    if (!this.VAO) {
-        console.error(`Failed to create VAO for ${this.objPath}.`);
-        return false;
-    }
-    this.calculateAABB();
-    this.updateModelMatrix();
-    this.updateBoundingBox();
-    return true;
-  }
+  async init() {
+    this.vertices = await WebGLUtils.loadOBJ(this.objPath, false);
+    if (!this.vertices || this.vertices.length === 0) {
+      console.error(`Failed to load OBJ vertices for ${this.objPath}.`);
+      return false;
+    }
+    this.texture = await WebGLUtils.loadTexture(this.gl, this.texturePath);
+    if (!this.texture) {
+      console.error(`Failed to load texture for ${this.texturePath}.`);
+      return false;
+    }
 
-  calculateAABB() {
-    let min = vec3.fromValues(Infinity, Infinity, Infinity);
-    let max = vec3.fromValues(-Infinity, -Infinity, -Infinity);
+    if (!this.program) {
+      console.error("Attempted to initialize Block with an invalid shader program.");
+      return false;
+    }
 
-    for (let i = 0; i < this.vertices.length; i += 8) {
-      const x = this.vertices[i];
-      const y = this.vertices[i + 1];
-      const z = this.vertices[i + 2];
-      min[0] = Math.min(min[0], x);
-      min[1] = Math.min(min[1], y);
-      min[2] = Math.min(min[2], z);
-      max[0] = Math.max(max[0], x);
-      max[1] = Math.max(max[1], y);
-      max[2] = Math.max(max[2], z);
-    }
-    this.boundingBox = { min, max };
-  }
+    this.gl.useProgram(this.program);
+    this.VAO = WebGLUtils.createVAO(this.gl, this.program, this.vertices, 8, [
+      { name: 'in_position', size: 3, offset: 0 },
+      { name: 'in_uv', size: 2, offset: 3 },
+      { name: 'in_normal', size: 3, offset: 5 },
+    ]);
 
-  updateModelMatrix() {
-    mat4.identity(this.modelMatrix);
-    mat4.translate(this.modelMatrix, this.modelMatrix, this.position);
-    mat4.scale(this.modelMatrix, this.modelMatrix, vec3.fromValues(this.scale, this.scale, this.scale));
-  }
+    if (!this.VAO) {
+      console.error(`Failed to create VAO for ${this.objPath}.`);
+      return false;
+    }
+    this.calculateAABB();
+    this.updateModelMatrix();
+    this.updateBoundingBox();
+    return true;
+  }
 
-  updateBoundingBox() {
-    const corners = [
-      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.min[1], this.boundingBox.min[2]),
-      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.min[1], this.boundingBox.min[2]),
-      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.max[1], this.boundingBox.min[2]),
-      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.max[1], this.boundingBox.min[2]),
-      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.min[1], this.boundingBox.max[2]),
-      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.min[1], this.boundingBox.max[2]),
-      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.max[1], this.boundingBox.max[2]), 
-      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.max[1], this.boundingBox.max[2]),
-    ];
+  calculateAABB() {
+    let min = vec3.fromValues(Infinity, Infinity, Infinity);
+    let max = vec3.fromValues(-Infinity, -Infinity, -Infinity);
 
-    const transformedCorners = corners.map(corner => {
-      const transformed = vec3.create();
-      vec3.transformMat4(transformed, corner, this.modelMatrix);
-      return transformed;
-    });
+    for (let i = 0; i < this.vertices.length; i += 8) {
+      const x = this.vertices[i];
+      const y = this.vertices[i + 1];
+      const z = this.vertices[i + 2];
+      min[0] = Math.min(min[0], x);
+      min[1] = Math.min(min[1], y);
+      min[2] = Math.min(min[2], z);
+      max[0] = Math.max(max[0], x);
+      max[1] = Math.max(max[1], y);
+      max[2] = Math.max(max[2], z);
+    }
+    this.boundingBox = { min, max };
+  }
 
-    let min = vec3.clone(transformedCorners[0]);
-    let max = vec3.clone(transformedCorners[0]);
+  updateModelMatrix() {
+    mat4.identity(this.modelMatrix);
+    mat4.translate(this.modelMatrix, this.modelMatrix, this.position);
+    mat4.scale(this.modelMatrix, this.modelMatrix, vec3.fromValues(this.scale, this.scale, this.scale));
+  }
 
-    transformedCorners.forEach(corner => {
-      vec3.min(min, min, corner);
-      vec3.max(max, max, corner);
-    });
+  updateBoundingBox() {
+    const corners = [
+      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.min[1], this.boundingBox.min[2]),
+      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.min[1], this.boundingBox.min[2]),
+      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.max[1], this.boundingBox.min[2]),
+      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.max[1], this.boundingBox.min[2]),
+      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.min[1], this.boundingBox.max[2]),
+      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.min[1], this.boundingBox.max[2]),
+      vec3.fromValues(this.boundingBox.min[0], this.boundingBox.max[1], this.boundingBox.max[2]),
+      vec3.fromValues(this.boundingBox.max[0], this.boundingBox.max[1], this.boundingBox.max[2]),
+    ];
 
-    this.transformedBoundingBox = { min, max };
-  }
+    const transformedCorners = corners.map(corner => {
+      const transformed = vec3.create();
+      vec3.transformMat4(transformed, corner, this.modelMatrix);
+      return transformed;
+    });
 
-  draw(viewMat, projectionMat) {
-    if (!this.program || !this.VAO) {
-        return;
-    }
+    let min = vec3.clone(transformedCorners[0]);
+    let max = vec3.clone(transformedCorners[0]);
 
-    this.gl.useProgram(this.program);
-    WebGLUtils.setUniformMatrix4fv(this.gl, this.program,
-      ["u_model", "u_view", "u_projection"],
-      [this.modelMatrix, viewMat, projectionMat]
-    );
-    this.gl.useProgram(this.program);
+    transformedCorners.forEach(corner => {
+      vec3.min(min, min, corner);
+      vec3.max(max, max, corner);
+    });
 
-    this.gl.bindVertexArray(this.VAO);
-    this.gl.activeTexture(this.gl.TEXTURE0);
-    this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
-    this.gl.drawArrays(this.gl.TRIANGLES, 0, this.vertices.length / 8);
-  }
+    this.transformedBoundingBox = { min, max };
+  }
 
-  drawBoundingBox(viewMat, projectionMat) {
-    if (!this.program) {
-        return;
-    }
+  draw(viewMat, projectionMat) {
+    if (!this.program || !this.VAO) {
+      return;
+    }
 
-    this.updateBoundingBox();
+    this.gl.useProgram(this.program);
+    WebGLUtils.setUniformMatrix4fv(this.gl, this.program,
+      ["u_model", "u_view", "u_projection"],
+      [this.modelMatrix, viewMat, projectionMat]
+    );
+    this.gl.useProgram(this.program);
 
-    const b = this.transformedBoundingBox;
-    const corners = [
-      vec3.fromValues(b.min[0], b.min[1], b.min[2]),
-      vec3.fromValues(b.max[0], b.min[1], b.min[2]),
-      vec3.fromValues(b.min[0], b.max[1], b.min[2]),
-      vec3.fromValues(b.max[0], b.max[1], b.min[2]),
-      vec3.fromValues(b.min[0], b.min[1], b.max[2]),
-      vec3.fromValues(b.max[0], b.min[1], b.max[2]),
-      vec3.fromValues(b.min[0], b.max[1], b.max[2]),  
-      vec3.fromValues(b.max[0], b.max[1], b.max[2]),
-    ];
+    this.gl.bindVertexArray(this.VAO);
+    this.gl.activeTexture(this.gl.TEXTURE0);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
+    this.gl.drawArrays(this.gl.TRIANGLES, 0, this.vertices.length / 8);
+  }
 
-    const edges = [
-      [0, 1], [1, 3], [3, 2], [2, 0],
-      [4, 5], [5, 7], [7, 6], [6, 4],
-      [0, 4], [1, 5], [2, 6], [3, 7]
-    ];
+  drawBoundingBox(viewMat, projectionMat) {
+    if (!this.program) {
+      return;
+    }
 
-    const lineVertices = [];
-    edges.forEach(([start, end]) => {
-      lineVertices.push(...corners[start]);
-      lineVertices.push(...corners[end]);
-    });
+    this.updateBoundingBox();
 
-    if (!this.boundingBoxVAO) {
-      this.boundingBoxVAO = this.gl.createVertexArray();
-      this.gl.bindVertexArray(this.boundingBoxVAO);
+    const b = this.transformedBoundingBox;
+    const corners = [
+      vec3.fromValues(b.min[0], b.min[1], b.min[2]),
+      vec3.fromValues(b.max[0], b.min[1], b.min[2]),
+      vec3.fromValues(b.min[0], b.max[1], b.min[2]),
+      vec3.fromValues(b.max[0], b.max[1], b.min[2]),
+      vec3.fromValues(b.min[0], b.min[1], b.max[2]),
+      vec3.fromValues(b.max[0], b.min[1], b.max[2]),
+      vec3.fromValues(b.min[0], b.max[1], b.max[2]),
+      vec3.fromValues(b.max[0], b.max[1], b.max[2]),
+    ];
 
-      this.boundingBoxVBO = this.gl.createBuffer();
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.boundingBoxVBO);
-      this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(lineVertices), this.gl.DYNAMIC_DRAW);
+    const edges = [
+      [0, 1], [1, 3], [3, 2], [2, 0],
+      [4, 5], [5, 7], [7, 6], [6, 4],
+      [0, 4], [1, 5], [2, 6], [3, 7]
+    ];
 
-      this.gl.useProgram(this.program);
-      const posLoc = this.gl.getAttribLocation(this.program, 'in_position');
-      if (posLoc === -1) {
-          console.warn("Attribute 'in_position' not found for bounding box shader. Check vertex shader.");
-      } else {
-          this.gl.enableVertexAttribArray(posLoc);
-          this.gl.vertexAttribPointer(posLoc, 3, this.gl.FLOAT, false, 0, 0); 
-      }
-    } else {
-      this.gl.bindVertexArray(this.boundingBoxVAO);
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.boundingBoxVBO);
-      this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, new Float32Array(lineVertices));
-    }
+    const lineVertices = [];
+    edges.forEach(([start, end]) => {
+      lineVertices.push(...corners[start]);
+      lineVertices.push(...corners[end]);
+    });
 
-    this.gl.useProgram(this.program);
-    WebGLUtils.setUniformMatrix4fv(this.gl, this.program,
-      ["u_model", "u_view", "u_projection"],
-      [mat4.identity(mat4.create()), viewMat, projectionMat]
-    );
-    this.gl.useProgram(this.program);
+    if (!this.boundingBoxVAO) {
+      this.boundingBoxVAO = this.gl.createVertexArray();
+      this.gl.bindVertexArray(this.boundingBoxVAO);
 
-    this.gl.bindVertexArray(this.boundingBoxVAO);
-    this.gl.drawArrays(this.gl.LINES, 0, lineVertices.length / 3);
-  }
+      this.boundingBoxVBO = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.boundingBoxVBO);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(lineVertices), this.gl.DYNAMIC_DRAW);
+
+      this.gl.useProgram(this.program);
+      const posLoc = this.gl.getAttribLocation(this.program, 'in_position');
+      if (posLoc === -1) {
+        console.warn("Attribute 'in_position' not found for bounding box shader. Check vertex shader.");
+      } else {
+        this.gl.enableVertexAttribArray(posLoc);
+        this.gl.vertexAttribPointer(posLoc, 3, this.gl.FLOAT, false, 0, 0);
+      }
+    } else {
+      this.gl.bindVertexArray(this.boundingBoxVAO);
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.boundingBoxVBO);
+      this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, new Float32Array(lineVertices));
+    }
+
+    this.gl.useProgram(this.program);
+    WebGLUtils.setUniformMatrix4fv(this.gl, this.program,
+      ["u_model", "u_view", "u_projection"],
+      [mat4.identity(mat4.create()), viewMat, projectionMat]
+    );
+    this.gl.useProgram(this.program);
+
+    this.gl.bindVertexArray(this.boundingBoxVAO);
+    this.gl.drawArrays(this.gl.LINES, 0, lineVertices.length / 3);
+  }
 }
 
 const faceNormals = {
-  0: vec3.fromValues(-1, 0, 0),
-  1: vec3.fromValues(1, 0, 0),
-  2: vec3.fromValues(0, -1, 0),
-  3: vec3.fromValues(0, 1, 0),
-  4: vec3.fromValues(0, 0, -1),
-  5: vec3.fromValues(0, 0, 1)
+  0: vec3.fromValues(-1, 0, 0),
+  1: vec3.fromValues(1, 0, 0),
+  2: vec3.fromValues(0, -1, 0),
+  3: vec3.fromValues(0, 1, 0),
+  4: vec3.fromValues(0, 0, -1),
+  5: vec3.fromValues(0, 0, 1)
 };
 
 const faceNames = {
-  0: 'Left (-X)',
-  1: 'Right (+X)',
-  2: 'Bottom (-Y)',
-  3: 'Top (+Y)',
-  4: 'Back (-Z)',
-  5: 'Front (+Z)'
+  0: 'Left (-X)',
+  1: 'Right (+X)',
+  2: 'Bottom (-Y)',
+  3: 'Top (+Y)',
+  4: 'Back (-Z)',
+  5: 'Front (+Z)'
 };
 
 function AABBintersectsAABB(aabb1, aabb2) {
-    return (aabb1.min[0] <= aabb2.max[0] && aabb1.max[0] >= aabb2.min[0]) &&
-           (aabb1.min[1] <= aabb2.max[1] && aabb1.max[1] >= aabb2.min[1]) &&
-           (aabb1.min[2] <= aabb2.max[2] && aabb1.max[2] >= aabb2.min[2]);
+  return (aabb1.min[0] <= aabb2.max[0] && aabb1.max[0] >= aabb2.min[0]) &&
+    (aabb1.min[1] <= aabb2.max[1] && aabb1.max[1] >= aabb2.min[1]) &&
+    (aabb1.min[2] <= aabb2.max[2] && aabb1.max[2] >= aabb2.min[2]);
 }
 
 function rayIntersectAABBWithFace(origin, direction, aabb, maxDistance = 8) {
-  let tNear = -Infinity;
-  let tFar = Infinity;
-  let faceIndex = -1;
+  let tNear = -Infinity;
+  let tFar = Infinity;
+  let faceIndex = -1;
 
-  for (let i = 0; i < 3; i++) {
-    if (Math.abs(direction[i]) < 1e-8) {
-      if (origin[i] < aabb.min[i] || origin[i] > aabb.max[i]) return null;
-    } else {
-      let ood = 1 / direction[i];
-      let t1 = (aabb.min[i] - origin[i]) * ood;
-      let t2 = (aabb.max[i] - origin[i]) * ood;
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(direction[i]) < 1e-8) {
+      if (origin[i] < aabb.min[i] || origin[i] > aabb.max[i]) return null;
+    } else {
+      let ood = 1 / direction[i];
+      let t1 = (aabb.min[i] - origin[i]) * ood;
+      let t2 = (aabb.max[i] - origin[i]) * ood;
 
-      let faceNear, faceFar;
-      if (t1 < t2) {
-        faceNear = i * 2 + 0;
-        faceFar = i * 2 + 1;
-      } else {
-        [t1, t2] = [t2, t1];
-        faceNear = i * 2 + 1;
-        faceFar = i * 2 + 0;
-      }
+      let faceNear, faceFar;
+      if (t1 < t2) {
+        faceNear = i * 2 + 0;
+        faceFar = i * 2 + 1;
+      } else {
+        [t1, t2] = [t2, t1];
+        faceNear = i * 2 + 1;
+        faceFar = i * 2 + 0;
+      }
 
-      if (t1 > tNear) {
-        tNear = t1;
-        faceIndex = faceNear;
-      }
-      if (t2 < tFar) {
-        tFar = t2;
-      }
+      if (t1 > tNear) {
+        tNear = t1;
+        faceIndex = faceNear;
+      }
+      if (t2 < tFar) {
+        tFar = t2;
+      }
 
-      if (tNear > tFar) return null;
-      if (tFar < 0) return null;
-    }
-  }
+      if (tNear > tFar) return null;
+      if (tFar < 0) return null;
+    }
+  }
 
-  if (tNear < 0 || tNear > maxDistance) return null;
+  if (tNear < 0 || tNear > maxDistance) return null;
 
-  const intersectionPoint = vec3.create();
-  vec3.scaleAndAdd(intersectionPoint, origin, direction, tNear);
+  const intersectionPoint = vec3.create();
+  vec3.scaleAndAdd(intersectionPoint, origin, direction, tNear);
 
-  return {
-    point: intersectionPoint,
-    faceIndex: faceIndex,
-    t: tNear
-  };
+  return {
+    point: intersectionPoint,
+    faceIndex: faceIndex,
+    t: tNear
+  };
 }
 
 function isBlockAtPosition(worldObjects, position, tolerance = 0.01) {
-  for (const obj of worldObjects) {
-    const objGridPos = vec3.fromValues(
-        Math.round(obj.position[0]),
-        Math.round(obj.position[1]),
-        Math.round(obj.position[2])
-    );
-    const targetGridPos = vec3.fromValues(
-        Math.round(position[0]),
-        Math.round(position[1]),
-        Math.round(position[2])
-    );
+  for (const obj of worldObjects) {
+    const objGridPos = vec3.fromValues(
+      Math.round(obj.position[0]),
+      Math.round(obj.position[1]),
+      Math.round(obj.position[2])
+    );
+    const targetGridPos = vec3.fromValues(
+      Math.round(position[0]),
+      Math.round(position[1]),
+      Math.round(position[2])
+    );
 
-    if (vec3.equals(objGridPos, targetGridPos)) {
-      return true;
-    }
-  }
-  return false;
+    if (vec3.equals(objGridPos, targetGridPos)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function main() {
@@ -305,7 +304,7 @@ async function main() {
   gl.useProgram(program);
   const textureLoc = gl.getUniformLocation(program, "u_texture");
   if (textureLoc === null) {
-      console.warn("Uniform 'u_texture' not found in shader program.");
+    console.warn("Uniform 'u_texture' not found in shader program.");
   }
 
 
@@ -320,7 +319,6 @@ async function main() {
   const movementSpeed = 0.25;
   const up = vec3.fromValues(0, 1, 0);
 
-  // === IZMENA 1: Dodate promenljive za kretanje gore/dole ===
   let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, moveUp = false, moveDown = false;
 
   const worldObjects = [];
@@ -335,41 +333,38 @@ async function main() {
     { obj: "../shapes/block2.obj", texture: "../textures/pinkconcrete.webp" },
     { obj: "../shapes/block2.obj", texture: "../textures/diamondblock.webp" },
   ];
-  
-  const blockUnitSize = 2.0 * 1.0; 
+
+  const blockUnitSize = 2.0 * 1.0;
 
   const collisionBuffer = 0.3;
-  const playerHeight = 0.01 + 2 * collisionBuffer; 
-  const playerWidth = 0.01 + 2 * collisionBuffer;
+  const playerHeight = 0.01 + 2 * collisionBuffer;
+  const playerWidth = 0.01 + 2 * collisionBuffer;
 
-  const playerCollisionOffset = vec3.fromValues(0, 0, 0); 
+  const playerCollisionOffset = vec3.fromValues(0, 0, 0);
 
   console.log("Initializing world...");
   gl.useProgram(program);
 
-  const worldSize = 11; // Defines the size of the grid (11x11)
+  const worldSize = 11;
   const halfWorldSize = Math.floor(worldSize / 2);
-  const blockPromises = []; // Array to hold all block initialization promises
+  const blockPromises = [];
 
-  // Use grass for the top layer
-  const grassBlockType = blockTypes[1]; 
-  
+  const grassBlockType = blockTypes[1];
+
   for (let x = -halfWorldSize; x <= halfWorldSize; x++) {
     for (let z = -halfWorldSize; z <= halfWorldSize; z++) {
-      // Create a new block at the current (x, z) position on a flat plane (y=0)
       const block = new Block(
-        gl, 
-        grassBlockType.obj, 
-        grassBlockType.texture, 
-        program, 
-        vec3.fromValues(x * blockUnitSize, 0, z * blockUnitSize), // Position blocks side-by-side
+        gl,
+        grassBlockType.obj,
+        grassBlockType.texture,
+        program,
+        vec3.fromValues(x * blockUnitSize, 0, z * blockUnitSize),
         1.0
       );
-      
-      // Start the async initialization and add the promise to our list
+
       blockPromises.push(block.init().then(success => {
         if (success) {
-          worldObjects.push(block); // Add the initialized block to the world
+          worldObjects.push(block);
         } else {
           console.error(`Failed to initialize block at (${x}, 0, ${z})`);
         }
@@ -377,7 +372,6 @@ async function main() {
     }
   }
 
-  // Wait for all blocks to finish initializing before continuing
   await Promise.all(blockPromises);
   console.log("World initialized with an 11x11 grid of blocks.");
 
@@ -427,7 +421,6 @@ async function main() {
     return false;
   }
 
-  // === IZMENA 2: Ažurirana funkcija za kretanje kamere ===
   function updateCameraPosition() {
     const front = vec3.fromValues(
       Math.cos(pitch) * Math.cos(yaw),
@@ -440,50 +433,45 @@ async function main() {
     vec3.cross(right, front, up);
     vec3.normalize(right, right);
 
-    // W, A, S, D kretanje
     const movementDelta = vec3.create();
     if (moveForward) vec3.scaleAndAdd(movementDelta, movementDelta, front, movementSpeed);
     if (moveBackward) vec3.scaleAndAdd(movementDelta, movementDelta, front, -movementSpeed);
     if (moveLeft) vec3.scaleAndAdd(movementDelta, movementDelta, right, -movementSpeed);
     if (moveRight) vec3.scaleAndAdd(movementDelta, movementDelta, right, movementSpeed);
-    
-    // Space/Shift vertikalno kretanje ("letenje")
+
     const verticalMovement = vec3.create();
     if (moveUp) vec3.scaleAndAdd(verticalMovement, verticalMovement, up, movementSpeed);
     if (moveDown) vec3.scaleAndAdd(verticalMovement, verticalMovement, up, -movementSpeed);
 
-    // Kombinujemo vertikalno kretanje od gledanja gore/dole i od "letenja"
     const totalYChange = movementDelta[1] + verticalMovement[1];
 
-    // Proveravamo svaku osu posebno da bismo izbegli zaglavljivanje
     let newXPos = vec3.clone(cameraPos);
     newXPos[0] += movementDelta[0];
     if (!checkCollision(newXPos)) {
-        cameraPos[0] = newXPos[0];
+      cameraPos[0] = newXPos[0];
     }
 
     let newYPos = vec3.clone(cameraPos);
     newYPos[1] += totalYChange;
     if (!checkCollision(newYPos)) {
-        cameraPos[1] = newYPos[1];
+      cameraPos[1] = newYPos[1];
     }
 
     let newZPos = vec3.clone(cameraPos);
     newZPos[2] += movementDelta[2];
     if (!checkCollision(newZPos)) {
-        cameraPos[2] = newZPos[2];
+      cameraPos[2] = newZPos[2];
     }
   }
 
-  // === IZMENA 3: Ažurirani event listener-i ===
   document.addEventListener('keydown', (e) => {
     switch (e.key) {
       case 'w': moveForward = true; break;
       case 's': moveBackward = true; break;
       case 'a': moveLeft = true; break;
       case 'd': moveRight = true; break;
-      case ' ': moveUp = true; break;         // Space taster za gore
-      case 'Shift': moveDown = true; break;  // Shift taster za dole
+      case ' ': moveUp = true; break;
+      case 'Shift': moveDown = true; break;
       case 'l': case 'L':
         if (document.pointerLockElement === gl.canvas) document.exitPointerLock();
         else gl.canvas.requestPointerLock();
@@ -497,173 +485,172 @@ async function main() {
       case 's': moveBackward = false; break;
       case 'a': moveLeft = false; break;
       case 'd': moveRight = false; break;
-      case ' ': moveUp = false; break;        // Otpuštanje Space tastera
-      case 'Shift': moveDown = false; break; // Otpuštanje Shift tastera
+      case ' ': moveUp = false; break;
+      case 'Shift': moveDown = false; break;
     }
   });
 
-  // ... (Ostatak main funkcije ostaje nepromenjen) ...
   document.addEventListener('pointerlockchange', () => {
-    console.log(document.pointerLockElement === gl.canvas ? 'Pointer locked' : 'Pointer unlocked');
-  });
+    console.log(document.pointerLockElement === gl.canvas ? 'Pointer locked' : 'Pointer unlocked');
+  });
 
-  document.addEventListener('mousemove', (e) => {
-    if (document.pointerLockElement === gl.canvas) {
-      yaw += e.movementX * sensitivity;
-      pitch -= e.movementY * sensitivity;
-      pitch = Math.max(Math.min(pitch, Math.PI / 2), -Math.PI / 2);
-    }
-  });
+  document.addEventListener('mousemove', (e) => {
+    if (document.pointerLockElement === gl.canvas) {
+      yaw += e.movementX * sensitivity;
+      pitch -= e.movementY * sensitivity;
+      pitch = Math.max(Math.min(pitch, Math.PI / 2), -Math.PI / 2);
+    }
+  });
 
-  gl.canvas.addEventListener('click', async (e) => {
-    if (e.button === 0) {
-        const forward = vec3.fromValues(
-            Math.cos(pitch) * Math.cos(yaw),
-            Math.sin(pitch),
-            Math.cos(pitch) * Math.sin(yaw)
-        );
-        vec3.normalize(forward, forward);
+  gl.canvas.addEventListener('click', async (e) => {
+    if (e.button === 0) {
+      const forward = vec3.fromValues(
+        Math.cos(pitch) * Math.cos(yaw),
+        Math.sin(pitch),
+        Math.cos(pitch) * Math.sin(yaw)
+      );
+      vec3.normalize(forward, forward);
 
-        let closestHit = null;
-        let closestT = Infinity;
-        let clickedObject = null;
-        let clickedObjectIndex = -1;
+      let closestHit = null;
+      let closestT = Infinity;
+      let clickedObject = null;
+      let clickedObjectIndex = -1;
 
-        for (let i = 0; i < worldObjects.length; i++) {
-            const obj = worldObjects[i];
-            obj.updateBoundingBox();
-            const hitInfo = rayIntersectAABBWithFace(cameraPos, forward, obj.transformedBoundingBox, 18);
-            if (hitInfo && hitInfo.t < closestT) {
-                closestT = hitInfo.t;
-                closestHit = hitInfo;
-                clickedObject = obj;
-                clickedObjectIndex = i;
-            }
-        }
+      for (let i = 0; i < worldObjects.length; i++) {
+        const obj = worldObjects[i];
+        obj.updateBoundingBox();
+        const hitInfo = rayIntersectAABBWithFace(cameraPos, forward, obj.transformedBoundingBox, 18);
+        if (hitInfo && hitInfo.t < closestT) {
+          closestT = hitInfo.t;
+          closestHit = hitInfo;
+          clickedObject = obj;
+          clickedObjectIndex = i;
+        }
+      }
 
-        if (clickedObject && clickedObjectIndex !== -1) {
-            console.log("Destroying block!");
-            worldObjects.splice(clickedObjectIndex, 1);
-        }
-    } else if (e.button === 2) {
-      const forward = vec3.fromValues(
-        Math.cos(pitch) * Math.cos(yaw),
-        Math.sin(pitch),
-        Math.cos(pitch) * Math.sin(yaw)
-      );
-      vec3.normalize(forward, forward);
+      if (clickedObject && clickedObjectIndex !== -1) {
+        console.log("Destroying block!");
+        worldObjects.splice(clickedObjectIndex, 1);
+      }
+    } else if (e.button === 2) {
+      const forward = vec3.fromValues(
+        Math.cos(pitch) * Math.cos(yaw),
+        Math.sin(pitch),
+        Math.cos(pitch) * Math.sin(yaw)
+      );
+      vec3.normalize(forward, forward);
 
-      let closestHit = null;
-      let closestT = Infinity;
-      let clickedObject = null;
+      let closestHit = null;
+      let closestT = Infinity;
+      let clickedObject = null;
 
-      for (const obj of worldObjects) {
-        obj.updateBoundingBox();
-        const hitInfo = rayIntersectAABBWithFace(cameraPos, forward, obj.transformedBoundingBox, 18);
-        if (hitInfo && hitInfo.t < closestT) {
-          closestT = hitInfo.t;
-          closestHit = hitInfo;
-          clickedObject = obj;
-        }
-      }
+      for (const obj of worldObjects) {
+        obj.updateBoundingBox();
+        const hitInfo = rayIntersectAABBWithFace(cameraPos, forward, obj.transformedBoundingBox, 18);
+        if (hitInfo && hitInfo.t < closestT) {
+          closestT = hitInfo.t;
+          closestHit = hitInfo;
+          clickedObject = obj;
+        }
+      }
 
-      if (closestHit && clickedObject) {
-        console.log("Ray hit an object!");
-        console.log("Hit face:", faceNames[closestHit.faceIndex]);
+      if (closestHit && clickedObject) {
+        console.log("Ray hit an object!");
+        console.log("Hit face:", faceNames[closestHit.faceIndex]);
 
-        const faceNormal = faceNormals[closestHit.faceIndex];
+        const faceNormal = faceNormals[closestHit.faceIndex];
 
-        const snappedClickedPosition = vec3.fromValues(
-          Math.round(clickedObject.position[0] / blockUnitSize) * blockUnitSize,
-          Math.round(clickedObject.position[1] / blockUnitSize) * blockUnitSize,
-          Math.round(clickedObject.position[2] / blockUnitSize) * blockUnitSize
-        );
+        const snappedClickedPosition = vec3.fromValues(
+          Math.round(clickedObject.position[0] / blockUnitSize) * blockUnitSize,
+          Math.round(clickedObject.position[1] / blockUnitSize) * blockUnitSize,
+          Math.round(clickedObject.position[2] / blockUnitSize) * blockUnitSize
+        );
 
-        const newBlockPosition = vec3.create();
-        vec3.scaleAndAdd(newBlockPosition, snappedClickedPosition, faceNormal, blockUnitSize);
+        const newBlockPosition = vec3.create();
+        vec3.scaleAndAdd(newBlockPosition, snappedClickedPosition, faceNormal, blockUnitSize);
 
-        const newBlockTempAABB = {
-            min: vec3.fromValues(newBlockPosition[0] - (blockUnitSize / 2), newBlockPosition[1] - (blockUnitSize / 2), newBlockPosition[2] - (blockUnitSize / 2)),
-            max: vec3.fromValues(newBlockPosition[0] + (blockUnitSize / 2), newBlockPosition[1] + (blockUnitSize / 2), newBlockPosition[2] + (blockUnitSize / 2)),
-        };
+        const newBlockTempAABB = {
+          min: vec3.fromValues(newBlockPosition[0] - (blockUnitSize / 2), newBlockPosition[1] - (blockUnitSize / 2), newBlockPosition[2] - (blockUnitSize / 2)),
+          max: vec3.fromValues(newBlockPosition[0] + (blockUnitSize / 2), newBlockPosition[1] + (blockUnitSize / 2), newBlockPosition[2] + (blockUnitSize / 2)),
+        };
 
-        const currentPlayerAABB = {
-            min: vec3.fromValues(
-                cameraPos[0] + playerCollisionOffset[0] - playerWidth / 2,
-                cameraPos[1] + playerCollisionOffset[1] - playerHeight / 2,
-                cameraPos[2] + playerCollisionOffset[2] - playerWidth / 2
-            ),
-            max: vec3.fromValues(
-                cameraPos[0] + playerCollisionOffset[0] + playerWidth / 2,
-                cameraPos[1] + playerCollisionOffset[1] + playerHeight / 2,
-                cameraPos[2] + playerCollisionOffset[2] + playerWidth / 2
-            ),
-        };
+        const currentPlayerAABB = {
+          min: vec3.fromValues(
+            cameraPos[0] + playerCollisionOffset[0] - playerWidth / 2,
+            cameraPos[1] + playerCollisionOffset[1] - playerHeight / 2,
+            cameraPos[2] + playerCollisionOffset[2] - playerWidth / 2
+          ),
+          max: vec3.fromValues(
+            cameraPos[0] + playerCollisionOffset[0] + playerWidth / 2,
+            cameraPos[1] + playerCollisionOffset[1] + playerHeight / 2,
+            cameraPos[2] + playerCollisionOffset[2] + playerWidth / 2
+          ),
+        };
 
-        if (!isBlockAtPosition(worldObjects, newBlockPosition) && !AABBintersectsAABB(newBlockTempAABB, currentPlayerAABB)) {
-          const selectedBlockType = blockTypes[selectedIndex];
-          if (selectedBlockType) {
-            gl.useProgram(program);
-            const newBlock = new Block(gl, selectedBlockType.obj, selectedBlockType.texture, program, newBlockPosition, 1.0);
-            console.log(`Attempting to place new block at: [${newBlockPosition[0]}, ${newBlockPosition[1]}, ${newBlockPosition[2]}]`);
-            const newBlockInitSuccess = await newBlock.init();
-            if (newBlockInitSuccess) {
-                worldObjects.push(newBlock);
-                console.log("New block placed successfully!");
-            } else {
-                console.error("Failed to initialize new block, not adding to world.");
-            }
-          } else {
-            console.warn("No block type selected or defined for this hotbar slot.");
-          }
-        } else {
-          console.log("Cannot place block: space already occupied or intersects player.");
-        }
-      } else {
-        console.log("Ray missed.");
-      }
-    }
-  });
+        if (!isBlockAtPosition(worldObjects, newBlockPosition) && !AABBintersectsAABB(newBlockTempAABB, currentPlayerAABB)) {
+          const selectedBlockType = blockTypes[selectedIndex];
+          if (selectedBlockType) {
+            gl.useProgram(program);
+            const newBlock = new Block(gl, selectedBlockType.obj, selectedBlockType.texture, program, newBlockPosition, 1.0);
+            console.log(`Attempting to place new block at: [${newBlockPosition[0]}, ${newBlockPosition[1]}, ${newBlockPosition[2]}]`);
+            const newBlockInitSuccess = await newBlock.init();
+            if (newBlockInitSuccess) {
+              worldObjects.push(newBlock);
+              console.log("New block placed successfully!");
+            } else {
+              console.error("Failed to initialize new block, not adding to world.");
+            }
+          } else {
+            console.warn("No block type selected or defined for this hotbar slot.");
+          }
+        } else {
+          console.log("Cannot place block: space already occupied or intersects player.");
+        }
+      } else {
+        console.log("Ray missed.");
+      }
+    }
+  });
 
-  function render() {
-    WebGLUtils.resizeCanvasToWindow(gl);
+  function render() {
+    WebGLUtils.resizeCanvasToWindow(gl);
 
-    gl.clearColor(1, 1, 1, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.clearColor(1, 1, 1, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    updateCameraPosition();
+    updateCameraPosition();
 
-    const front = vec3.fromValues(
-      Math.cos(pitch) * Math.cos(yaw),
-      Math.sin(pitch),
-      Math.cos(pitch) * Math.sin(yaw)
-    );
-    vec3.normalize(front, front);
+    const front = vec3.fromValues(
+      Math.cos(pitch) * Math.cos(yaw),
+      Math.sin(pitch),
+      Math.cos(pitch) * Math.sin(yaw)
+    );
+    vec3.normalize(front, front);
 
-    const viewMat = mat4.create();
-    mat4.lookAt(viewMat, cameraPos, vec3.add(vec3.create(), cameraPos, front), up);
+    const viewMat = mat4.create();
+    mat4.lookAt(viewMat, cameraPos, vec3.add(vec3.create(), cameraPos, front), up);
 
-    const projectionMat = mat4.create();
-    mat4.perspective(projectionMat, Math.PI / 4, gl.canvas.width / gl.canvas.height, 0.1, 100.0);
+    const projectionMat = mat4.create();
+    mat4.perspective(projectionMat, Math.PI / 4, gl.canvas.width / gl.canvas.height, 0.1, 100.0);
 
-    gl.useProgram(program);
-    WebGLUtils.setUniform3f(gl, program,
-      ["u_light_direction", "u_ambient_color", "u_light_color", "u_view_direction"],
-      [front, ambientColor, lightColor, cameraPos]
-    );
-    gl.useProgram(program);
-    gl.uniform1i(textureLoc, 0);
+    gl.useProgram(program);
+    WebGLUtils.setUniform3f(gl, program,
+      ["u_light_direction", "u_ambient_color", "u_light_color", "u_view_direction"],
+      [front, ambientColor, lightColor, cameraPos]
+    );
+    gl.useProgram(program);
+    gl.uniform1i(textureLoc, 0);
 
-    for (const obj of worldObjects) {
-      obj.updateModelMatrix();
-      obj.draw(viewMat, projectionMat);
-      obj.drawBoundingBox(viewMat, projectionMat);
-    }
+    for (const obj of worldObjects) {
+      obj.updateModelMatrix();
+      obj.draw(viewMat, projectionMat);
+      obj.drawBoundingBox(viewMat, projectionMat);
+    }
 
-    requestAnimationFrame(render);
-  }
+    requestAnimationFrame(render);
+  }
 
-  render();
+  render();
 }
 
 main();
