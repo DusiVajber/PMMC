@@ -328,27 +328,58 @@ async function main() {
     { obj: "../shapes/cube.obj", texture: "../textures/dirt.webp" },
     { obj: "../shapes/grass.obj", texture: "../textures/grass.webp" },
     { obj: "../shapes/log.obj", texture: "../textures/log.webp" },
-    { obj: "../shapes/log.obj", texture: "../textures/plank.webp" },
+    { obj: "../shapes/block2.obj", texture: "../textures/plank.webp" },
     { obj: "../shapes/grass.obj", texture: "../textures/brick.webp" },
     { obj: "../shapes/grass.obj", texture: "../textures/stone.webp" },
+    { obj: "../shapes/block2.obj", texture: "../textures/whitewool.webp" },
+    { obj: "../shapes/block2.obj", texture: "../textures/pinkconcrete.webp" },
+    { obj: "../shapes/block2.obj", texture: "../textures/diamondblock.webp" },
   ];
   
   const blockUnitSize = 2.0 * 1.0; 
 
-  const playerHeight = 0.01; 
-  const playerWidth = 0.01; 
-  const playerCollisionOffset = vec3.fromValues(0, 0, 0);
+  const collisionBuffer = 0.3;
+  const playerHeight = 0.01 + 2 * collisionBuffer; 
+  const playerWidth = 0.01 + 2 * collisionBuffer;
 
-  console.log("Initializing initial block...");
+  const playerCollisionOffset = vec3.fromValues(0, 0, 0); 
+
+  console.log("Initializing world...");
   gl.useProgram(program);
-  const initialBlock = new Block(gl, blockTypes[0].obj, blockTypes[0].texture, program, vec3.fromValues(0, 0, 0), 1.0);
-  const initSuccess = await initialBlock.init();
-  if (!initSuccess) {
-      console.error("Failed to initialize initial block. Aborting.");
-      return;
+
+  const worldSize = 11; // Defines the size of the grid (11x11)
+  const halfWorldSize = Math.floor(worldSize / 2);
+  const blockPromises = []; // Array to hold all block initialization promises
+
+  // Use grass for the top layer
+  const grassBlockType = blockTypes[1]; 
+  
+  for (let x = -halfWorldSize; x <= halfWorldSize; x++) {
+    for (let z = -halfWorldSize; z <= halfWorldSize; z++) {
+      // Create a new block at the current (x, z) position on a flat plane (y=0)
+      const block = new Block(
+        gl, 
+        grassBlockType.obj, 
+        grassBlockType.texture, 
+        program, 
+        vec3.fromValues(x * blockUnitSize, 0, z * blockUnitSize), // Position blocks side-by-side
+        1.0
+      );
+      
+      // Start the async initialization and add the promise to our list
+      blockPromises.push(block.init().then(success => {
+        if (success) {
+          worldObjects.push(block); // Add the initialized block to the world
+        } else {
+          console.error(`Failed to initialize block at (${x}, 0, ${z})`);
+        }
+      }));
+    }
   }
-  worldObjects.push(initialBlock);
-  console.log("Initial block initialized.");
+
+  // Wait for all blocks to finish initializing before continuing
+  await Promise.all(blockPromises);
+  console.log("World initialized with an 11x11 grid of blocks.");
 
   const hotbar = document.getElementById('hotbar');
   const slots = hotbar.querySelectorAll('.hotbar-slot');
